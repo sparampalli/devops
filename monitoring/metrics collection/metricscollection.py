@@ -2063,20 +2063,21 @@ class avi_metrics():
                 resp = self.avi_request(event_url, 'admin').json()
 
                 # Send the event list to the Endpoint
-                temp_payload = self.payload_template.copy()
-                temp_payload['timestamp'] = int(time.time())
-                temp_payload['metric_type'] = "controller_events"
-                temp_payload['metric_name'] = "controller_events." + event_ptr.lower()
-                temp_payload['metric_value'] = resp["count"]
-                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_events||%s' % event_ptr
+                if resp["count"] > 0:
+                    temp_payload = self.payload_template.copy()
+                    temp_payload['timestamp'] = int(time.time())
+                    temp_payload['metric_type'] = "controller_events"
+                    temp_payload['metric_name'] = "controller_events." + event_ptr.lower()
+                    temp_payload['metric_value'] = resp["count"]
+                    temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_events||%s' % event_ptr
 
-                # Capture the current value for Mem/CPU/Disk events
-                if ((event_ptr in not_supported) or (event_ptr == "SE_DISK_HIGH")) and (resp["count"] > 0):
-                    data = sorted(
-                        list(map(lambda x: x["event_details"]["metric_threshold_up_details"]["current_value"], resp["results"])))
-                    temp_payload['values'] = "|".join(str(item) for item in data)
+                    # Capture the current value for Mem/CPU/Disk events
+                    if (event_ptr in not_supported) or (event_ptr == "SE_DISK_HIGH"):
+                        data = sorted(
+                            list(map(lambda x: x["event_details"]["metric_threshold_up_details"]["current_value"], resp["results"])))
+                        temp_payload['values'] = "|".join(str(item) for item in data)
 
-                endpoint_payload_list.append(temp_payload)
+                    endpoint_payload_list.append(temp_payload)
 
             if len(endpoint_payload_list) > 0:
                 send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
