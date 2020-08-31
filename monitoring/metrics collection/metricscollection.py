@@ -29,7 +29,7 @@ version = 'v2019-12-20'
 #    1. python 3.6+                                                                     #
 #    2. python3 requests                                                                #
 #    3. python3 yaml                                                                    #
-#    3. python3 pytz                                                                    #
+#                                                                                       #
 #                                                                                       #
 #                                                                                       #
 #                                                                                       #
@@ -2037,8 +2037,6 @@ class avi_metrics():
 
     def controller_list_events(self):
         try:
-            from datetime import datetime
-            import pytz
             from packaging import version
 
             temp_start_time = time.time()
@@ -2046,7 +2044,6 @@ class avi_metrics():
             # Events supported in 18.2.5+ onwards
             not_supported = ['CONTROLLER_CPU_HIGH', 'CONTROLLER_DISK_HIGH', 'CONTROLLER_MEM_HIGH']
             event_list = self.controller_event_list
-            current_datetime = datetime.now().astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 
             # Get the controller version to filter out certain events
             controller_version = self.avi_request('version/controller', 'admin')
@@ -2060,11 +2057,9 @@ class avi_metrics():
             for event_ptr in event_list:
                 event_url = "analytics/logs?type=2&" \
                             "filter=eq(event_id,{0})&" \
-                            "end={1}&"   \
                             "duration=300&" \
-                            "step=3&" \
                             "groupby=report_timestamp&" \
-                            "timeout=3&".format(event_ptr, current_datetime)
+                            "timeout=3&".format(event_ptr)
                 resp = self.avi_request(event_url, 'admin').json()
 
                 # Send the event list to the Endpoint
