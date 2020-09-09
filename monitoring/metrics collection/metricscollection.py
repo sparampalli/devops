@@ -17,6 +17,7 @@ import yaml
 import json
 import urllib3
 import requests
+
 version = 'v2019-12-20'
 
 
@@ -27,7 +28,7 @@ version = 'v2019-12-20'
 #  REQUIREMENTS:                                                                        #
 #    1. python 3.6+                                                                     #
 #    2. python3 requests                                                                #
-#    2. python3 yaml                                                                    #
+#    3. python3 yaml                                                                    #
 #                                                                                       #
 #                                                                                       #
 #                                                                                       #
@@ -545,6 +546,11 @@ class avi_metrics():
             self.controller_runtime = True
         else:
             self.controller_runtime = False
+
+        if 'controller_stats_config' in controller_config and controller_config.get('controller_stats_config').get('controller_events') == True:
+            self.controller_events = True
+        else:
+            self.controller_events = False
         # ------ PRINT CONFIGURATION ------
         print('-------------------------------------------------------------------')
         print('============ CONFIGURATION FOR: '+avi_cluster_name+':'+self.avi_cluster_ip + ' ============')
@@ -582,6 +588,7 @@ class avi_metrics():
             self.controller_metrics = False
             print('CONTROLLER METRICS:  False')
         print('CONTROLLER RUNTIME:  '+str(self.controller_runtime))
+        print('CONTROLLER EVENTS:  '+str(self.controller_events))
         print('-------------------------------------------------------------------')
         print('-------------------------------------------------------------------')
 
@@ -725,6 +732,24 @@ class avi_metrics():
             'l7_server.avg_total_requests',
             'healthscore.health_score_value'
         ]
+
+        self.controller_event_list = ['CONTROLLER_CPU_HIGH',
+                                      'CONTROLLER_DISK_HIGH',
+                                      'CONTROLLER_LEADER_FAILOVER',
+                                      'CONTROLLER_MEM_HIGH',
+                                      'CONTROLLER_NODE_DB_REPLICATION_FAILED',
+                                      'CONTROLLER_NODE_LEFT',
+                                      'CONTROLLER_NODE_SHUTDOWN',
+                                      'CONTROLLER_SERVICE_FAILURE',
+                                      'CONTROLLER_SERVICE_CRITICAL_FAILURE',
+                                      'CONTROLLER_WARM_REBOOT',
+                                      'CONTROLLER_NODE_JOINED',
+                                      'CONTROLLER_NODE_STARTED',
+                                      'GS_DOWN',
+                                      'GS_GROUP_DOWN',
+                                      'GS_MEMBER_DOWN',
+                                      'METRICS_DB_DISK_FULL',
+                                      'SE_DISK_HIGH']
 
     def avi_login(self):
         try:
@@ -2007,6 +2032,65 @@ class avi_metrics():
             exception_text = traceback.format_exc()
             print(str(datetime.now())+' '+self.avi_cluster_ip+': '+exception_text)
 
+    # -----------------------------------
+    # ----- GET Events pushed to Endpoints
+
+    def controller_list_events(self):
+        try:
+            from packaging import version
+
+            temp_start_time = time.time()
+            endpoint_payload_list = []
+            # Events supported in 18.2.5+ onwards
+            not_supported = ['CONTROLLER_CPU_HIGH', 'CONTROLLER_DISK_HIGH', 'CONTROLLER_MEM_HIGH']
+            event_list = self.controller_event_list
+
+            # Get the controller version to filter out certain events
+            controller_version = self.avi_request('version/controller', 'admin')
+
+            if controller_version.status_code == 200:
+                controller_version = json.loads(controller_version.content)[0]
+                controller_version = controller_version["version"].split("(")[0]
+                if version.parse(controller_version) < version.parse("18.2.5"):
+                    event_list = [item for item in event_list if item not in not_supported]
+
+            for event_ptr in event_list:
+                event_url = "analytics/logs?type=2&" \
+                            "filter=eq(event_id,{0})&" \
+                            "duration=300&" \
+                            "groupby=report_timestamp&" \
+                            "timeout=3&".format(event_ptr)
+                resp = self.avi_request(event_url, 'admin').json()
+
+                # Send the event list to the Endpoint
+                if resp["count"] > 0:
+                    temp_payload = self.payload_template.copy()
+                    temp_payload['timestamp'] = int(time.time())
+                    temp_payload['metric_type'] = "controller_events"
+                    temp_payload['metric_name'] = "controller_events." + event_ptr.lower()
+                    temp_payload['metric_value'] = resp["count"]
+                    temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_events||%s' % event_ptr
+
+                    # Capture the current value for Mem/CPU/Disk events
+                    if (event_ptr in not_supported) or (event_ptr == "SE_DISK_HIGH"):
+                        data = sorted(
+                            list(map(lambda x: x["event_details"]["metric_threshold_up_details"]["current_value"], resp["results"])))
+                        temp_payload['values'] = "|".join(str(item) for item in data)
+
+                    endpoint_payload_list.append(temp_payload)
+
+            if len(endpoint_payload_list) > 0:
+                send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
+
+            temp_total_time = str(time.time()-temp_start_time)
+            print(str(datetime.now())+' '+self.avi_cluster_ip +
+                  ': func controller_list_events, executed in '+temp_total_time+' seconds')
+        except Exception:
+            print(str(datetime.now())+' '+self.avi_cluster_ip +
+                  ': func controller_list_events encountered an error')
+            exception_text = traceback.format_exc()
+            print(str(datetime.now())+' '+self.avi_cluster_ip+': '+exception_text)
+
 
 # -----------------------------------
 # -----------------------------------
@@ -2015,6 +2099,7 @@ class avi_metrics():
     # -----------------------------------
     # ----- This is the method within the class that will execute the other methods.
     # ----- all test methods will need to be added to test_functions list to be executed
+
 
     def gather_metrics(self):
         try:
@@ -2058,6 +2143,9 @@ class avi_metrics():
                     test_functions.append(self.license_usage)
                     test_functions.append(self.license_expiration)
                     test_functions.append(self.get_controller_version)
+                if self.controller_events == True:
+                    test_functions.append(self.controller_list_events)
+
                 # -----------------------------------
                 _flist = []
                 for _t in test_functions:
