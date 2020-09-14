@@ -551,6 +551,11 @@ class avi_metrics():
             self.controller_events = True
         else:
             self.controller_events = False
+
+        if 'controller_stats_config' in controller_config and controller_config.get('controller_stats_config').get('controller_stats') == True:
+            self.controller_stats = True
+        else:
+            self.controller_stats = False
         # ------ PRINT CONFIGURATION ------
         print('-------------------------------------------------------------------')
         print('============ CONFIGURATION FOR: '+avi_cluster_name+':'+self.avi_cluster_ip + ' ============')
@@ -589,6 +594,7 @@ class avi_metrics():
             print('CONTROLLER METRICS:  False')
         print('CONTROLLER RUNTIME:  '+str(self.controller_runtime))
         print('CONTROLLER EVENTS:  '+str(self.controller_events))
+        print('CONTROLLER STATS:  '+str(self.controller_stats))
         print('-------------------------------------------------------------------')
         print('-------------------------------------------------------------------')
 
@@ -2091,6 +2097,46 @@ class avi_metrics():
             exception_text = traceback.format_exc()
             print(str(datetime.now())+' '+self.avi_cluster_ip+': '+exception_text)
 
+    # -----------------------------------
+    # ----- GET Controller stats pushed to Endpoints
+    def controller_collect_stats(self):
+        try:
+            temp_start_time = time.time()
+            endpoint_payload_list = []
+
+            metrics = ["total_logins", "num_of_clouds", "num_of_vs", "num_of_se"]
+            metrics_map = {
+                "total_logins": "analytics/logs?type=2&filter=eq(event_id,USER_LOGIN)&duration=300&groupby=report_timestamp&timeout=3&",
+                "num_of_clouds": "cloud",
+                "num_of_vs": "virtualservice?page_size=1",
+                "num_of_se": "serviceengine?page_size=1",
+            }
+
+            for metric_ptr in metrics:
+                resp = self.avi_request(metrics_map[metric_ptr], "*")
+
+                if resp.status_code == 200:
+                    resp = resp.json()
+                    temp_payload = self.payload_template.copy()
+                    temp_payload['timestamp'] = int(time.time())
+                    temp_payload['metric_type'] = "controller_stats"
+                    temp_payload['metric_name'] = "controller_stats.%s" % metric_ptr
+                    temp_payload['metric_value'] = resp["count"]
+                    temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_stats||%s' % metric_ptr
+
+                    endpoint_payload_list.append(temp_payload)
+
+            if len(endpoint_payload_list) > 0:
+                send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
+
+            temp_total_time = str(time.time()-temp_start_time)
+            print(str(datetime.now())+' '+self.avi_cluster_ip +
+                  ': func controller_collect_stats, executed in '+temp_total_time+' seconds')
+        except Exception:
+            print(str(datetime.now())+' '+self.avi_cluster_ip +
+                  ': func controller_collect_stats encountered an error')
+            exception_text = traceback.format_exc()
+            print(str(datetime.now())+' '+self.avi_cluster_ip+': '+exception_text)
 
 # -----------------------------------
 # -----------------------------------
@@ -2100,12 +2146,24 @@ class avi_metrics():
     # ----- This is the method within the class that will execute the other methods.
     # ----- all test methods will need to be added to test_functions list to be executed
 
-
     def gather_metrics(self):
         try:
             start_time = time.time()
             self.login = self.avi_login()
             if self.login.status_code == 200:
+
+                # Send the UP status
+                endpoint_payload_list = []
+                temp_payload = self.payload_template.copy()
+                temp_payload['timestamp'] = int(time.time())
+                temp_payload['metric_type'] = 'controller_state'
+                temp_payload['metric_name'] = 'controller_status'
+                temp_payload['metric_value'] = 1
+                temp_payload['value'] = "UP"
+                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_state'
+                endpoint_payload_list.append(temp_payload)
+                send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
+
                 self.tenants = self.login.json()['tenants']
                 #self.avi_controller = self.controller_to_poll()
                 # -----------------------------------
@@ -2145,6 +2203,8 @@ class avi_metrics():
                     test_functions.append(self.get_controller_version)
                 if self.controller_events == True:
                     test_functions.append(self.controller_list_events)
+                if self.controller_stats == True:
+                    test_functions.append(self.controller_collect_stats)
 
                 # -----------------------------------
                 _flist = []
@@ -2191,6 +2251,19 @@ class avi_metrics():
                 endpoint_payload_list.append(temp_payload)
                 send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
             elif self.login.status_code == 'timedout':
+
+                # Send the DOWN status
+                endpoint_payload_list = []
+                temp_payload = self.payload_template.copy()
+                temp_payload['timestamp'] = int(time.time())
+                temp_payload['metric_type'] = 'controller_state'
+                temp_payload['metric_name'] = 'controller_status'
+                temp_payload['metric_value'] = 0
+                temp_payload['value'] = "DOWN"
+                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_state'
+                endpoint_payload_list.append(temp_payload)
+                send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
+
                 print(self.avi_cluster_ip+': AVI ERROR: timeout trying to access '+self.avi_cluster_ip)
             elif self.login.status_code == '401':
                 print(self.avi_cluster_ip+': AVI ERROR: unable to login to '+self.avi_cluster_ip+' : '+self.login.text)

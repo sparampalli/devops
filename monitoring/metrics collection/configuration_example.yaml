@@ -33,6 +33,7 @@ controllers:
       controller_metrics: True
       controller_runtime: True
       controller_events: True
+      controller_stats: True
       controller_metrics_list:
         - controller_stats.avg_cpu_usage
         - controller_stats.avg_disk_usage
