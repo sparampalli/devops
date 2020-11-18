@@ -346,7 +346,7 @@ def send_value_splunk_hec(endpoint_info, splunk_payload):
             keys_to_remove = ["avicontroller", "name_space"]
             payload = splunk_payload_template.copy()
             payload['host'] = temp_entry['avicontroller']
-            #payload['source'] = temp_entry['avicontroller']
+            # payload['source'] = temp_entry['avicontroller']
             payload['time'] = temp_entry['timestamp']
             payload['sourcetype'] = 'avi:metrics'
             payload['event']['avi_controller'] = temp_entry['avicontroller']
@@ -406,7 +406,7 @@ def send_value_wavefront(endpoint_info, payload):
                 sock.connect((wf_instance, wf_proxy_port))
                 sock.send(message.encode())
                 sock.close()
-                #print(str(datetime.now())+' ======> Metrics sent to wavefront')
+                # print(str(datetime.now())+' ======> Metrics sent to wavefront')
             except:
                 print(str(datetime.now())+'  =====> ERROR: func send_to_wavefront encountered an error')
                 exception_text = traceback.format_exc()
@@ -503,8 +503,8 @@ class avi_metrics():
         self.controller_config = controller_config
         # ------ Default Metric Payload Template
         self.payload_template = {}
-        #self.payload_template['location'] = self.host_location
-        #self.payload_template['environment'] = self.host_environment
+        # self.payload_template['location'] = self.host_location
+        # self.payload_template['environment'] = self.host_environment
         self.payload_template['avicontroller'] = self.avi_cluster_name
         if controller_config.get('tags') != None:
             for k, v in controller_config['tags'].items():
@@ -556,6 +556,12 @@ class avi_metrics():
             self.controller_stats = True
         else:
             self.controller_stats = False
+
+        if 'controller_stats_config' in controller_config and "process_stats" in controller_config['controller_stats_config']:
+            self.process_stats = True
+            self.process_stats_list = ",".join(controller_config["controller_stats_config"]["process_stats"])
+        else:
+            self.process_stats = False
         # ------ PRINT CONFIGURATION ------
         print('-------------------------------------------------------------------')
         print('============ CONFIGURATION FOR: '+avi_cluster_name+':'+self.avi_cluster_ip + ' ============')
@@ -595,6 +601,7 @@ class avi_metrics():
         print('CONTROLLER RUNTIME:  '+str(self.controller_runtime))
         print('CONTROLLER EVENTS:  '+str(self.controller_events))
         print('CONTROLLER STATS:  '+str(self.controller_stats))
+        print('CONTROLLER STATS:  '+str(self.process_stats))
         print('-------------------------------------------------------------------')
         print('-------------------------------------------------------------------')
 
@@ -1293,7 +1300,7 @@ class avi_metrics():
                                         temp_payload['se_group'] = self.vs_dict[entry]['se_group']
                                         temp_payload['vs_name'] = vs_name
                                         temp_payload['metric_type'] = 'virtualservice_metrics_per_serviceengine'
-                                        #temp_payload['metric_name'] = d['header']['name']
+                                        # temp_payload['metric_name'] = d['header']['name']
                                         temp_payload['metric_value'] = d['data'][0]['value']
                                         if self.vs_realtime == True:
                                             if 'series' in realtime_stats:
@@ -1858,7 +1865,7 @@ class avi_metrics():
         try:
             temp_start_time = time.time()
             endpoint_payload_list = []
-            #current_version = self.login.json()['version']['Version']+'('+str(self.login.json()['version']['build'])+')'
+            # current_version = self.login.json()['version']['Version']+'('+str(self.login.json()['version']['build'])+')'
             cluster_status = self.avi_request('cluster/runtime', 'admin').json()
             current_version = cluster_status['node_info']['version'].split(' ', 1)[0]
             temp_payload = self.payload_template.copy()
@@ -1971,7 +1978,7 @@ class avi_metrics():
                                     else:
                                         for v in self.pool_dict[d['header']['pool_ref'].rsplit('#', 1)[0].split('api/pool/')[1]]['results']['virtualservices']:
                                             vs_name = v.rsplit('#', 1)[1]
-                                            #temp_payload1 = temp_payload.copy()
+                                            # temp_payload1 = temp_payload.copy()
                                             temp_payload['vs_name'] = vs_name
                                             temp_payload['name_space'] = 'avi||%s||virtualservice||%s||pool||%s||%s||%s' % (
                                                 self.avi_cluster_name, vs_name, pool_name, server_object, metric_name)
@@ -2138,6 +2145,49 @@ class avi_metrics():
             exception_text = traceback.format_exc()
             print(str(datetime.now())+' '+self.avi_cluster_ip+': '+exception_text)
 
+    # ----- GET Controller process stats pushed to Endpoints
+    def controller_process_stats(self):
+        try:
+            temp_start_time = time.time()
+            endpoint_payload_list = []
+
+            api_url = "analytics/metrics/controller/?metric_id=%s&limit=1&step=300&obj_id=*" % self.process_stats_list
+            resp = self.avi_request(api_url, "*")
+
+            if resp.status_code == 200:
+                resp = resp.json()
+                temp_payload = self.payload_template.copy()
+
+                if resp["count"] > 0:
+                    for metric_ptr in resp["results"][0]["series"]:
+                        temp_payload = self.payload_template.copy()
+                        temp_payload['timestamp'] = int(time.time())
+                        temp_payload['metric_type'] = "process_stats"
+                        temp_payload['metric_name'] = metric_ptr["header"]["name"] + \
+                            "." + metric_ptr["header"]["obj_id"]
+                        temp_payload['metric_value'] = metric_ptr["data"][0]["value"]
+                        temp_payload["units"] = metric_ptr["header"]["units"]
+                        temp_payload["server"] = metric_ptr["header"]["server"]
+                        temp_payload["description"] = metric_ptr["header"]["metric_description"]
+                        temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + \
+                            '||process_stats||%s' % metric_ptr["header"]["obj_id"]
+
+                        endpoint_payload_list.append(temp_payload)
+
+                endpoint_payload_list.append(temp_payload)
+
+            if len(endpoint_payload_list) > 0:
+                send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
+
+            temp_total_time = str(time.time()-temp_start_time)
+            print(str(datetime.now())+' '+self.avi_cluster_ip +
+                  ': func controller_process_stats, executed in '+temp_total_time+' seconds')
+        except Exception:
+            print(str(datetime.now())+' '+self.avi_cluster_ip +
+                  ': func controller_process_stats encountered an error')
+            exception_text = traceback.format_exc()
+            print(str(datetime.now())+' '+self.avi_cluster_ip+': '+exception_text)
+
 # -----------------------------------
 # -----------------------------------
 # -----------------------------------
@@ -2165,7 +2215,7 @@ class avi_metrics():
                 send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
 
                 self.tenants = self.login.json()['tenants']
-                #self.avi_controller = self.controller_to_poll()
+                # self.avi_controller = self.controller_to_poll()
                 # -----------------------------------
                 # ----- Add Test functions to list for threaded execution
                 # -----------------------------------
@@ -2205,6 +2255,8 @@ class avi_metrics():
                     test_functions.append(self.controller_list_events)
                 if self.controller_stats == True:
                     test_functions.append(self.controller_collect_stats)
+                if self.process_stats == True:
+                    test_functions.append(self.controller_process_stats)
 
                 # -----------------------------------
                 _flist = []
