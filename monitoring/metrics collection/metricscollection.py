@@ -2168,7 +2168,6 @@ class avi_metrics():
                         temp_payload['metric_value'] = metric_ptr["data"][0]["value"]
                         temp_payload["units"] = metric_ptr["header"]["units"]
                         temp_payload["server"] = metric_ptr["header"]["server"]
-                        temp_payload["description"] = metric_ptr["header"]["metric_description"]
                         temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + \
                             '||process_stats||%s' % metric_ptr["header"]["obj_id"]
 
