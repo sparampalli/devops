@@ -601,7 +601,7 @@ class avi_metrics():
         print('CONTROLLER RUNTIME:  '+str(self.controller_runtime))
         print('CONTROLLER EVENTS:  '+str(self.controller_events))
         print('CONTROLLER STATS:  '+str(self.controller_stats))
-        print('CONTROLLER STATS:  '+str(self.process_stats))
+        print('CONTROLLER PROCESS STATS:  '+str(self.process_stats))
         print('-------------------------------------------------------------------')
         print('-------------------------------------------------------------------')
 
