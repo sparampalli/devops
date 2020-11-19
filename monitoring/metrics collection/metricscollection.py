@@ -379,6 +379,7 @@ def send_value_wavefront(endpoint_info, payload):
                 wf_proxy_port = 2878
         wf_instance = endpoint_info['instance']
         for m in payload:
+
             tag_list = []
             metric_name = m['metric_name']
             metric_value = m['metric_value']
@@ -2172,8 +2173,6 @@ class avi_metrics():
                             '||process_stats||%s' % metric_ptr["header"]["obj_id"]
 
                         endpoint_payload_list.append(temp_payload)
-
-                endpoint_payload_list.append(temp_payload)
 
             if len(endpoint_payload_list) > 0:
                 send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
