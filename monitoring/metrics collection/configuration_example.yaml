@@ -34,6 +34,9 @@ controllers:
       controller_runtime: True
       controller_events: True
       controller_stats: True
+      process_stats:
+        - process_stats.avg_pss
+        - process_stats.max_cpu_pct
       controller_metrics_list:
         - controller_stats.avg_cpu_usage
         - controller_stats.avg_disk_usage
