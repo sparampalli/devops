@@ -2204,11 +2204,11 @@ class avi_metrics():
                 endpoint_payload_list = []
                 temp_payload = self.payload_template.copy()
                 temp_payload['timestamp'] = int(time.time())
-                temp_payload['metric_type'] = 'controller_state'
-                temp_payload['metric_name'] = 'controller_status'
+                temp_payload['metric_type'] = 'controller_stats'
+                temp_payload['metric_name'] = 'controller_stats.controller_status'
                 temp_payload['metric_value'] = 1
                 temp_payload['value'] = "UP"
-                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_state'
+                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_stats.controller_state'
                 endpoint_payload_list.append(temp_payload)
                 send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
 
@@ -2306,11 +2306,11 @@ class avi_metrics():
                 endpoint_payload_list = []
                 temp_payload = self.payload_template.copy()
                 temp_payload['timestamp'] = int(time.time())
-                temp_payload['metric_type'] = 'controller_state'
-                temp_payload['metric_name'] = 'controller_status'
+                temp_payload['metric_type'] = 'controller_stats'
+                temp_payload['metric_name'] = 'controller_stats.controller_status'
                 temp_payload['metric_value'] = 0
                 temp_payload['value'] = "DOWN"
-                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_state'
+                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_stats.controller_state'
                 endpoint_payload_list.append(temp_payload)
                 send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
 
