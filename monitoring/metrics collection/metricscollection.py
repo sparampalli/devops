@@ -2208,7 +2208,7 @@ class avi_metrics():
                 temp_payload['metric_name'] = 'controller_stats.controller_status'
                 temp_payload['metric_value'] = 1
                 temp_payload['value'] = "UP"
-                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_stats.controller_status'
+                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_stats||controller_status'
                 endpoint_payload_list.append(temp_payload)
                 send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
 
@@ -2310,7 +2310,7 @@ class avi_metrics():
                 temp_payload['metric_name'] = 'controller_stats.controller_status'
                 temp_payload['metric_value'] = 0
                 temp_payload['value'] = "DOWN"
-                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_stats.controller_status'
+                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_stats||controller_status'
                 endpoint_payload_list.append(temp_payload)
                 send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
 
