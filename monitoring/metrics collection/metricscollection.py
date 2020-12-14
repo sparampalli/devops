@@ -2136,7 +2136,6 @@ class avi_metrics():
             temp_payload['metric_type'] = 'controller_stats'
             temp_payload['metric_name'] = 'controller_stats.controller_status'
             temp_payload['metric_value'] = value
-            temp_payload['value'] = status
             temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_stats||controller_status'
             endpoint_payload_list.append(temp_payload)
 
