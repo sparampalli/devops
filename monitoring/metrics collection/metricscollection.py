@@ -2120,6 +2120,25 @@ class avi_metrics():
                 "num_of_se": "serviceengine?page_size=1",
             }
 
+            try:
+                response = requests.get("https://%s" % self.avi_cluster_name, verify=True, timeout=10)
+                status = "UP"
+                value = 1
+            except requests.exceptions.ConnectTimeout:
+                status = "DOWN"
+                value = 0
+            except requests.exceptions.ConnectionError:
+                status = "DOWN"
+                value = 0
+
+            temp_payload = self.payload_template.copy()
+            temp_payload['timestamp'] = int(time.time())
+            temp_payload['metric_type'] = 'controller_stats'
+            temp_payload['metric_name'] = 'controller_stats.controller_status'
+            temp_payload['metric_value'] = value
+            temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_stats||controller_status'
+            endpoint_payload_list.append(temp_payload)
+
             for metric_ptr in metrics:
                 resp = self.avi_request(metrics_map[metric_ptr], "*")
 
@@ -2199,19 +2218,6 @@ class avi_metrics():
             start_time = time.time()
             self.login = self.avi_login()
             if self.login.status_code == 200:
-
-                # Send the UP status
-                endpoint_payload_list = []
-                temp_payload = self.payload_template.copy()
-                temp_payload['timestamp'] = int(time.time())
-                temp_payload['metric_type'] = 'controller_state'
-                temp_payload['metric_name'] = 'controller_status'
-                temp_payload['metric_value'] = 1
-                temp_payload['value'] = "UP"
-                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_state'
-                endpoint_payload_list.append(temp_payload)
-                send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
-
                 self.tenants = self.login.json()['tenants']
                 # self.avi_controller = self.controller_to_poll()
                 # -----------------------------------
@@ -2301,19 +2307,6 @@ class avi_metrics():
                 endpoint_payload_list.append(temp_payload)
                 send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
             elif self.login.status_code == 'timedout':
-
-                # Send the DOWN status
-                endpoint_payload_list = []
-                temp_payload = self.payload_template.copy()
-                temp_payload['timestamp'] = int(time.time())
-                temp_payload['metric_type'] = 'controller_state'
-                temp_payload['metric_name'] = 'controller_status'
-                temp_payload['metric_value'] = 0
-                temp_payload['value'] = "DOWN"
-                temp_payload['name_space'] = 'avi||'+self.avi_cluster_name + '||controller_state'
-                endpoint_payload_list.append(temp_payload)
-                send_metriclist_to_endpoint(self.endpoint_list, endpoint_payload_list)
-
                 print(self.avi_cluster_ip+': AVI ERROR: timeout trying to access '+self.avi_cluster_ip)
             elif self.login.status_code == '401':
                 print(self.avi_cluster_ip+': AVI ERROR: unable to login to '+self.avi_cluster_ip+' : '+self.login.text)
